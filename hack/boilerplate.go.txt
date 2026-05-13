@@ -1,0 +1,1 @@
+// Package hack provides boilerplate for code generation.

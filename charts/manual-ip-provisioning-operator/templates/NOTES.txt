@@ -1,0 +1,2 @@
+1. Get the application URL by running these commands:
+  kubectl get pods -l "app.kubernetes.io/name={{ include "manual-ip-provisioning-operator.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o wide

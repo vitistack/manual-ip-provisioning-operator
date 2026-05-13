@@ -1,0 +1,6 @@
+apiVersion: v2
+name: manual-ip-provisioning-operator
+description: Kubernetes operator for manual network provisioning of NetworkNamespace resources
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
