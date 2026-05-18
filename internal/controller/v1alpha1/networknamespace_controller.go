@@ -18,12 +18,14 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	vitistackcrdsv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -160,22 +162,20 @@ func isManualProvisioning(nn *vitistackcrdsv1alpha1.NetworkNamespace) bool {
 }
 
 // setStatus updates the NetworkNamespace status with the provided fields.
-// It derives provisioningPhase and Ready condition automatically from Phase.
+// It derives provisioningPhase from Phase and writes it via a JSON merge patch
+// since provisioningPhase is a v1alpha2 field not present on the v1alpha1 Go struct.
 func (r *NetworkNamespaceReconciler) setStatus(
 	ctx context.Context,
 	nn *vitistackcrdsv1alpha1.NetworkNamespace,
 	newStatus vitistackcrdsv1alpha1.NetworkNamespaceStatus,
 ) error {
 	// Derive provisioningPhase from phase.
-	if newStatus.ProvisioningPhase == "" {
-		switch newStatus.Phase {
-		case phaseReady:
-			newStatus.ProvisioningPhase = provisioningPhaseReady
-		case reasonError:
-			newStatus.ProvisioningPhase = provisioningPhaseError
-		default:
-			newStatus.ProvisioningPhase = provisioningPhasePending
-		}
+	provisioningPhase := provisioningPhasePending
+	switch newStatus.Phase {
+	case phaseReady:
+		provisioningPhase = provisioningPhaseReady
+	case reasonError:
+		provisioningPhase = provisioningPhaseError
 	}
 
 	// Skip no-op updates.
@@ -189,8 +189,28 @@ func (r *NetworkNamespaceReconciler) setStatus(
 		newStatus.Conditions = upsertCondition(nn.Status.Conditions, condition)
 	}
 
-	nn.Status = newStatus
-	return r.Status().Update(ctx, nn)
+	// Use a merge patch so we can write provisioningPhase (a v1alpha2 field)
+	// alongside the typed v1alpha1 status fields.
+	patch := map[string]interface{}{
+		"status": map[string]interface{}{
+			"phase":                newStatus.Phase,
+			"status":               newStatus.Status,
+			"message":              newStatus.Message,
+			"created":              newStatus.Created,
+			"observedGeneration":   newStatus.ObservedGeneration,
+			"dataCenterIdentifier": newStatus.DataCenterIdentifier,
+			"supervisorIdentifier": newStatus.SupervisorIdentifier,
+			"ipv4Prefix":           newStatus.IPv4Prefix,
+			"vlanId":               newStatus.VlanID,
+			"provisioningPhase":    provisioningPhase,
+			"conditions":           newStatus.Conditions,
+		},
+	}
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	return r.Status().Patch(ctx, nn, client.RawPatch(types.MergePatchType, patchBytes))
 }
 
 // statusEqual returns true if the relevant status fields are unchanged.
@@ -200,7 +220,6 @@ func statusEqual(old, new vitistackcrdsv1alpha1.NetworkNamespaceStatus) bool {
 		old.Message == new.Message &&
 		old.Created.Equal(&new.Created) &&
 		old.ObservedGeneration == new.ObservedGeneration &&
-		old.ProvisioningPhase == new.ProvisioningPhase &&
 		old.DataCenterIdentifier == new.DataCenterIdentifier &&
 		old.SupervisorIdentifier == new.SupervisorIdentifier &&
 		old.IPv4Prefix == new.IPv4Prefix &&
