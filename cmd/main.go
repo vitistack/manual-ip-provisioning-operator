@@ -24,8 +24,9 @@ import (
 	"github.com/spf13/viper"
 	"github.com/vitistack/common/pkg/loggers/vlog"
 	vitistackcrdsv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
+	vitistackcrdsv1alpha2 "github.com/vitistack/common/pkg/v1alpha2"
 	"github.com/vitistack/manual-ip-provisioning-operator/internal/consts"
-	controllerv1alpha1 "github.com/vitistack/manual-ip-provisioning-operator/internal/controller/v1alpha1"
+	controllerv1alpha2 "github.com/vitistack/manual-ip-provisioning-operator/internal/controller/v1alpha2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,6 +48,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(vitistackcrdsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vitistackcrdsv1alpha2.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }
@@ -73,7 +75,7 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":9081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -117,7 +119,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	reconciler := controllerv1alpha1.NewNetworkNamespaceReconciler(mgr.GetClient(), mgr.GetScheme())
+	reconciler := controllerv1alpha2.NewNetworkNamespaceReconciler(mgr.GetClient(), mgr.GetScheme())
 	if err := reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NetworkNamespace")
 		os.Exit(1)

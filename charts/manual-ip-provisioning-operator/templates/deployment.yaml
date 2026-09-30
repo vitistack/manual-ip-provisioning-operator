@@ -42,7 +42,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: health
-              containerPort: 8081
+              containerPort: 9081
               protocol: TCP
           {{- with .Values.livenessProbe }}
           livenessProbe:
